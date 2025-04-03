@@ -7,3 +7,5 @@ class Settings(BaseSettings):
         env_file=".env",
         extra="ignore"
     )
+
+DBsettings = Settings()
