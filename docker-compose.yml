@@ -1,0 +1,20 @@
+# version: '3.8'
+
+services:
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    restart: always
+
+  # Optional: if you want to add your FastAPI app here too
+  # app:
+  #   build: .
+  #   container_name: fastapi_app
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     - redis
+  #   environment:
+  #     REDIS_HOST: redis

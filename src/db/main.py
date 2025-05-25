@@ -1,17 +1,30 @@
-from sqlmodel import create_engine, text
+from sqlmodel import create_engine, SQLModel
 from sqlalchemy.ext.asyncio import AsyncEngine
-from src.config import DBsettings
+from sqlmodel.ext.asyncio.session import AsyncSession
+from sqlalchemy.orm import sessionmaker
+from src.config import Config
 
-engine = AsyncEngine(
+async_engine = AsyncEngine(
     create_engine(
-        url=DBsettings.DATABASE_URL,
+        url=Config.DATABASE_URL,
         echo=True
     )
 )
 
-async def init_db():
-    async with engine.begin() as conn:
-        statement = text("STATEMENT 'hello';")
+async def init_db() -> None:
+    async with async_engine.begin() as conn:
+        from src.app.models import User
 
-        result = await conn.execute(statement)
-        print(result.all())
+        await conn.run_sync(SQLModel.metadata.create_all)
+    
+
+async def get_session():
+    
+    Session = sessionmaker(
+        bind=async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False
+    )
+
+    async with Session() as session:
+        yield session
