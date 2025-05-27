@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uuid import UUID
 from typing import List
-from src.app import schemas, models
+from src.app import schemas, models, errors
 from src.app.auth.dependencies import access_token_bearer, RoleChecker
 from src.app.services import job_service, user_service, application_service as apps
 from src.db.main import get_session
@@ -19,8 +19,7 @@ async def parse_uuid_or_404(user_id: str) -> UUID:
     try:
         return UUID(user_id)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid ID")
+        raise errors.InvalidId()
 
 
 @apps_router.get('/applications', status_code=status.HTTP_200_OK, response_model=List[schemas.Application])
@@ -36,9 +35,7 @@ async def get_job_applications(job_uid: str, session: AsyncSession = Depends(get
     job = await job_service.get_job_by_id(job_uid, session)
 
     if job is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
-        )
+        raise errors.JobNotFound()
 
     job_applications = await apps.get_job_applications(job.uid, session)
 
@@ -71,10 +68,7 @@ async def get_application(application_id: str, session: AsyncSession = Depends(g
         return application
     
     else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found"
-        )
+        raise errors.ApplicationNotFound()
     
 
 
@@ -86,10 +80,7 @@ async def update_application(application_id: str, payload: schemas.ApplicationUp
     #granting access to the endpoint
     current_user = token_details.get('user')['user_uid']
     if application_to_update.user_uid != UUID(current_user):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have access to this endpoint!"
-        )
+        raise errors.NotAuthorized()
 
     if application_to_update is not None:
 
@@ -98,30 +89,22 @@ async def update_application(application_id: str, payload: schemas.ApplicationUp
         return update_application
     
     else:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Application not found"
-        )
+        raise errors.ApplicationNotFound()
 
 
 
 
-@apps_router.delete('/jobs/{job_uid}', status_code=status.HTTP_204_NO_CONTENT)
-async def delete_job(job_uid: str, session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
+@apps_router.delete('/applications/{application_uid}', status_code=status.HTTP_204_NO_CONTENT)
+async def delete_application(application_id: str, session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
 
-    job = await job_service.get_job_by_id(job_uid, session)
-    if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found"
-        )
+    apps_to_delete = await apps.get_application_by_id(application_id, session)
+    if not apps_to_delete:
+        raise errors.ApplicationNotFound()
 
     current_user = UUID(token_details.get('user')['user_uid'])
 
-    if job.employer_uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not authorized to perform this action!"
-        )
+    if apps_to_delete.user_uid != current_user:
+        raise errors.NotAuthorized()
+    await apps.delete_application(application_id, session)
 
-    await job_service.delete_job(job_uid, session)
+

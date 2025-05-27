@@ -210,6 +210,18 @@ class ApplicationService():
             await session.commit()
         
         return application
+    
+    async def delete_application(self, application_id: str, session: AsyncSession):
+
+        app_to_delete = await self.get_application_by_id(application_id, session)
+
+        if app_to_delete is not None:
+
+            await session.delete(app_to_delete)
+            await session.commit()
+
+        else: 
+            return None
 
 
 

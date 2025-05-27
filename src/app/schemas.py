@@ -69,3 +69,12 @@ class Application(BaseModel):
     user_uid: uuid.UUID
     job_uid: uuid.UUID
     created_at: datetime 
+
+
+class UserDetails(User):
+    job: List[Job]
+    application: List[Application]
+
+
+class JobDetails(Job):
+    application: List[Application]

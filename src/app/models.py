@@ -21,8 +21,8 @@ class User(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
     updated_at: datetime = Field(sa_column=Column(pg.TIMESTAMP, default=datetime.now))
 
-    jobs: List["Job"] = Relationship(back_populates="employer")
-    applications: List["Application"] = Relationship(back_populates="user")
+    job: List["Job"] = Relationship(back_populates="employer", sa_relationship_kwargs={"lazy": "selectin"})
+    application: List["Application"] = Relationship(back_populates="user", sa_relationship_kwargs={"lazy": "selectin"})
 
     def __repr__(self):
         return f"<User id={self.uid}, username={self.username}, email={self.email_address}>"
@@ -39,8 +39,8 @@ class Job(SQLModel, table=True):
     employer_uid: uuid.UUID = Field(sa_column=Column(pg.UUID(as_uuid=True), ForeignKey("users.uid"), nullable=False))
     created_at: datetime = Field(default_factory=datetime.now, sa_column=Column(pg.TIMESTAMP(timezone=True), nullable=False))
 
-    employer: Optional["User"] = Relationship(back_populates="jobs")
-    applications: List["Application"] = Relationship(back_populates="jobs")
+    employer: Optional["User"] = Relationship(back_populates="job")
+    application: List["Application"] = Relationship(back_populates="job", sa_relationship_kwargs={"lazy": "selectin"})
 
 
 class Application(SQLModel, table=True):
@@ -52,7 +52,7 @@ class Application(SQLModel, table=True):
     cover_letter: str = Field(sa_column=Column(Text, nullable=False))
     created_at: datetime = Field(default_factory=datetime.now, sa_column=Column(pg.TIMESTAMP(timezone=True), nullable=False))
 
-    jobs: Optional["Job"] = Relationship(back_populates="applications")
-    user: Optional["User"] = Relationship(back_populates="applications")
+    job: Optional["Job"] = Relationship(back_populates="application")
+    user: Optional["User"] = Relationship(back_populates="application")
 
     __table_args__ = (UniqueConstraint("job_uid", "user_uid", name="uq_job_seeker"),)

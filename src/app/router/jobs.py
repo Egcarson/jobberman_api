@@ -3,7 +3,7 @@ from fastapi.responses import JSONResponse
 from sqlmodel.ext.asyncio.session import AsyncSession
 from uuid import UUID
 from typing import List
-from src.app import schemas, models
+from src.app import schemas, models, errors
 from src.app.auth.dependencies import access_token_bearer, RoleChecker
 from src.app.services import job_service, user_service
 from src.db.main import get_session
@@ -19,8 +19,7 @@ async def parse_uuid_or_404(user_id: str) -> UUID:
     try:
         return UUID(user_id)
     except ValueError:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Invalid ID")
+        raise errors.InvalidId()
 
 
 @job_router.get('/jobs', status_code=status.HTTP_200_OK, response_model=List[schemas.Job])
@@ -30,7 +29,7 @@ async def get_all_jobs(session: AsyncSession = Depends(get_session), current_use
     return jobs
 
 
-@job_router.get('/jobs/{job_uid}', status_code=status.HTTP_200_OK, response_model=schemas.Job)
+@job_router.get('/jobs/{job_uid}', status_code=status.HTTP_200_OK, response_model=schemas.JobDetails)
 async def get_job(job_uid: str, session: AsyncSession = Depends(get_session), token_details=Depends(access_token_bearer)):
 
     job = await job_service.get_job_by_id(job_uid, session)
@@ -38,10 +37,7 @@ async def get_job(job_uid: str, session: AsyncSession = Depends(get_session), to
     if job is not None:
         return job
 
-    raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND, detail="Job not found"
-    )
-
+    raise errors.JobNotFound()
 
 @job_router.post('/jobs', status_code=status.HTTP_201_CREATED, response_model=schemas.Job, dependencies=[job_listing_role])
 async def create_job(payload: schemas.JobCreate, session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
@@ -56,11 +52,8 @@ async def create_job(payload: schemas.JobCreate, session: AsyncSession = Depends
 async def get_employer_jobs(user_uid: str, session: AsyncSession = Depends(get_session), token_details: dict=Depends(access_token_bearer)):
     current_user = token_details.get('user')['user_uid']
     if user_uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not allowed to perform this action"
-        )
-
+        raise errors.NotAuthorized()
+    
     jobs = await job_service.get_employer_jobs(current_user, session)
 
     return jobs
@@ -83,18 +76,12 @@ async def update_job(job_uid: str, payload: schemas.JobUpdate, session: AsyncSes
 
     job = await job_service.get_job_by_id(job_uid, session)
     if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found"
-        )
+        raise errors.JobNotFound()
 
     current_user = UUID(token_details.get('user')['user_uid'])
 
     if job.employer_uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not authorized to perform this action!"
-        )
+        raise errors.NotAuthorized()
     
     updated_job = await job_service.update_job(job_uid, payload, session)
     
@@ -105,17 +92,11 @@ async def delete_job(job_uid: str, session: AsyncSession = Depends(get_session),
 
     job = await job_service.get_job_by_id(job_uid, session)
     if not job:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Job not found"
-        )
+        raise errors.JobNotFound()
 
     current_user = UUID(token_details.get('user')['user_uid'])
 
     if job.employer_uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not authorized to perform this action!"
-        )
+        raise errors.NotAuthorized()
     
     await job_service.delete_job(job_uid, session)

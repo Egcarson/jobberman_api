@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlmodel.ext.asyncio.session import AsyncSession
 from typing import List
 from uuid import UUID
-from src.app import schemas
+from src.app import schemas, errors
 from src.db.main import get_session
 from src.app.services import user_service
 from src.app.auth.dependencies import access_token_bearer
@@ -20,22 +20,20 @@ async def parse_uuid_or_404(user_id: str) -> UUID:
     try:
         return UUID(user_id)
     except ValueError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Invalid ID")
+        raise errors.InvalidId()
     
 @user_router.get("/users", status_code=status.HTTP_200_OK, response_model=List[schemas.User], dependencies=[role_checker])
 async def get_all_users(session: AsyncSession = Depends(get_session), token_details=Depends(access_token_bearer)):
     users = await user_service.get_all_users(session)
     return users
 
-@user_router.get("/users/{user_uid}", status_code=status.HTTP_200_OK, response_model=schemas.User)
+@user_router.get("/users/{user_uid}", status_code=status.HTTP_200_OK, response_model=schemas.UserDetails)
 async def get_user(user_uid: UUID = Depends(parse_uuid_or_404), session: AsyncSession = Depends(get_session), current_user=Depends(access_token_bearer)):
 
     user = await user_service.get_user(user_uid, session)
 
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="No user found"
-        )
+        raise errors.UserNotFound()
     
     return user
 
@@ -46,16 +44,12 @@ async def update_user(user_data: schemas.UserUpdate, user_uid: str, session: Asy
     user_to_update = await user_service.get_user(user_uid, session)
 
     if user_to_update is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
-        )
+        raise errors.UserNotFound()
 
     current_user = UUID(token_details.get('user')['user_uid'])
 
     if user_to_update.uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized. Action aborted!"
-        )
+        raise errors.NotAuthorized()
 
     updated_user = await user_service.update_user(user_uid, user_data, session)
 
@@ -67,16 +61,12 @@ async def delete_user(user_uid:str, session: AsyncSession = Depends(get_session)
     user_to_delete = await user_service.get_user(user_uid, session)
 
     if user_to_delete is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail='User not found'
-        )
+        raise errors.UserNotFound()
 
     current_user = UUID(token_details.get('user')['user_uid'])
 
     if user_to_delete.uid != current_user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authorized. Action aborted!"
-        )
+        raise errors.NotAuthorized()
     
     await user_service.delete_user(user_uid, session)
 

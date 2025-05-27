@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from datetime import datetime, timedelta, timezone
 from src.db.main import get_session
 from src.app.auth.utils import verify_password, create_access_token
-from src.app import schemas
+from src.app import schemas, errors
 from src.app.services import user_service
 from src.app.auth.dependencies import refresh_token_bearer, access_token_bearer
 from src.db.redis import add_token_to_blocklist
@@ -28,9 +28,7 @@ async def signup(user_data:schemas.UserCreate, session: AsyncSession = Depends(g
     existing_user = await user_service.existing_user(email, session)
     
     if existing_user:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="User already exists. Please proceed to Login"
-        )
+        raise errors.UserAlreadyExists()
     
     new_user = await user_service.create_user(user_data, session)
 
@@ -78,16 +76,14 @@ async def login(login_data: schemas.LoginData, session: AsyncSession = Depends(g
                 }
             )
     
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Email or Password"
-    )
+    raise errors.InvalidEmailOrPassword()
 
 @auth_router.get('/refresh_token', status_code=status.HTTP_200_OK)
 async def get_new_access_token(token_details: dict = Depends(refresh_token_bearer)):
 
     expiry_time = token_details['exp']
 
-    if datetime.fromtimestamp(expiry_time) > datetime.now(timezone.utc):
+    if datetime.fromtimestamp(expiry_time, tz=timezone.utc) > datetime.now(timezone.utc):
         new_access_token = create_access_token(
             user_data=token_details['user']
         )
@@ -97,9 +93,7 @@ async def get_new_access_token(token_details: dict = Depends(refresh_token_beare
             }
         )
     
-    raise HTTPException(
-        status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token"
-    )
+    raise errors.InvalidToken()
 
 @auth_router.get('/me')
 async def get_current_user(user = Depends(get_current_user), _: bool = Depends(role_checker)):
