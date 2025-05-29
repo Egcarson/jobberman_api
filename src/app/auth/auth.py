@@ -10,6 +10,7 @@ from src.app.services import user_service
 from src.app.auth.dependencies import refresh_token_bearer, access_token_bearer
 from src.db.redis import add_token_to_blocklist
 from src.app.auth.dependencies import get_current_user, RoleChecker
+import logging
 
 
 auth_router = APIRouter(
@@ -75,7 +76,7 @@ async def login(login_data: schemas.LoginData, session: AsyncSession = Depends(g
                     }
                 }
             )
-    
+    logging.error("user entered an invalid Password or Username")
     raise errors.InvalidEmailOrPassword()
 
 @auth_router.get('/refresh_token', status_code=status.HTTP_200_OK)
