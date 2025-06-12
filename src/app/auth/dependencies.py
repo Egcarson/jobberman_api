@@ -76,6 +76,9 @@ class RoleChecker:
         self.allowed_roles = [role.lower() for role in allowed_roles]
 
     def __call__(self, current_user: User = Depends(get_current_user)) -> Any:
+
+        if not current_user.is_verified:
+            raise errors.AccountNotVerified()
         
         user_role = current_user.role.lower()
         if user_role in self.allowed_roles:

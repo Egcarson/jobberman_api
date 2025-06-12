@@ -78,3 +78,14 @@ class UserDetails(User):
 
 class JobDetails(Job):
     application: List[Application]
+
+
+class EmailModel(BaseModel):
+    addresses: List[str]
+
+class PasswordResetRequest(BaseModel):
+    email_address: EmailStr
+
+class ConfirmPasswordReset(BaseModel):
+    new_password: str
+    confirm_password: str

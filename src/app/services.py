@@ -53,6 +53,16 @@ class UserService:
             return user_to_update
         else:
             return None
+    
+    async def update_user_info(self, user: User, user_data: dict, session: AsyncSession):
+        
+        for k, v in user_data.items():
+            setattr(user, k, v)
+
+        await session.commit()
+        
+        return user
+
 
     async def delete_user(self, user_uid: str, session: AsyncSession):
         user_to_delete = await self.get_user(user_uid, session)

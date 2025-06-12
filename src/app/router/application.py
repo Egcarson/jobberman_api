@@ -13,6 +13,7 @@ apps_router = APIRouter(
     tags=['Application']
 )
 who_can_apply = Depends(RoleChecker(["user"]))
+general_roles = Depends(RoleChecker(["user", "admin", "employer"]))
 
 
 async def parse_uuid_or_404(user_id: str) -> UUID:
@@ -22,14 +23,14 @@ async def parse_uuid_or_404(user_id: str) -> UUID:
         raise errors.InvalidId()
 
 
-@apps_router.get('/applications', status_code=status.HTTP_200_OK, response_model=List[schemas.Application])
+@apps_router.get('/applications', status_code=status.HTTP_200_OK, response_model=List[schemas.Application], dependencies=[general_roles])
 async def get_all_apps(session: AsyncSession = Depends(get_session), current_user: models.User = Depends(access_token_bearer)):
     applications = await apps.get_applications(session)
 
     return applications
 
 
-@apps_router.get('/applications/list/{job_uid}', status_code=status.HTTP_200_OK, response_model=List[schemas.Application])
+@apps_router.get('/applications/list/{job_uid}', status_code=status.HTTP_200_OK, response_model=List[schemas.Application], dependencies=[general_roles])
 async def get_job_applications(job_uid: str, session: AsyncSession = Depends(get_session), token_details=Depends(access_token_bearer)):
 
     job = await job_service.get_job_by_id(job_uid, session)
@@ -52,7 +53,7 @@ async def create_application(job_id: str, payload: schemas.ApplicationCreate, se
     return new_application
 
 
-@apps_router.get('/applications/list', status_code=status.HTTP_200_OK, response_model=List[schemas.Application])
+@apps_router.get('/applications/list', status_code=status.HTTP_200_OK, response_model=List[schemas.Application], dependencies=[general_roles])
 async def get_user_applications(session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
     current_user = token_details.get('user')['user_uid']
  
@@ -60,7 +61,7 @@ async def get_user_applications(session: AsyncSession = Depends(get_session), to
 
     return user_applications
 
-@apps_router.get('/applications/{application_uid}', status_code=status.HTTP_200_OK, response_model=schemas.Application)
+@apps_router.get('/applications/{application_uid}', status_code=status.HTTP_200_OK, response_model=schemas.Application, dependencies=[general_roles])
 async def get_application(application_id: str, session: AsyncSession = Depends(get_session), token_details: dict=Depends(access_token_bearer)):
     application = await apps.get_application_by_id(application_id, session)
 
@@ -72,7 +73,7 @@ async def get_application(application_id: str, session: AsyncSession = Depends(g
     
 
 
-@apps_router.put('/applications/{application_uid}', status_code=status.HTTP_202_ACCEPTED, response_model=schemas.Application)
+@apps_router.put('/applications/{application_uid}', status_code=status.HTTP_202_ACCEPTED, response_model=schemas.Application, dependencies=[general_roles])
 async def update_application(application_id: str, payload: schemas.ApplicationUpdate, session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
 
     application_to_update = await apps.get_application_by_id(application_id, session)
@@ -94,7 +95,7 @@ async def update_application(application_id: str, payload: schemas.ApplicationUp
 
 
 
-@apps_router.delete('/applications/{application_uid}', status_code=status.HTTP_204_NO_CONTENT)
+@apps_router.delete('/applications/{application_uid}', status_code=status.HTTP_204_NO_CONTENT, dependencies=[general_roles])
 async def delete_application(application_id: str, session: AsyncSession = Depends(get_session), token_details: dict = Depends(access_token_bearer)):
 
     apps_to_delete = await apps.get_application_by_id(application_id, session)
@@ -105,6 +106,7 @@ async def delete_application(application_id: str, session: AsyncSession = Depend
 
     if apps_to_delete.user_uid != current_user:
         raise errors.NotAuthorized()
+    
     await apps.delete_application(application_id, session)
 
 

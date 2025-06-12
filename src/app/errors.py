@@ -56,6 +56,9 @@ class ApplicationNotFound(ExceptionSystemManager):
     """Application does not exist!"""
     pass
 
+class AccountNotVerified(ExceptionSystemManager):
+    """Account has not been verified"""
+    pass
 
 def create_exception_handler(status_code: int, initial_detail: Any) -> Callable[[Request, Exception], JSONResponse]:
 
@@ -206,6 +209,18 @@ def register_all_errors(app: FastAPI):
             initial_detail={
                 "message": "Application not found",
                 "error_code": "application_not_found"
+            }
+        )
+    )
+
+    app.add_exception_handler(
+        AccountNotVerified,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_detail={
+                "message": "Account not verified",
+                "error_code": "account_not_verified",
+                "resolution": "Please check your email for verification link"
             }
         )
     )
